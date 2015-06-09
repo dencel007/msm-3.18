@@ -409,6 +409,10 @@ const struct cpumask *cpu_coregroup_mask(int cpu)
 		cpu, arch_scale_cpu_capacity(NULL, cpu));
 }
 
+	{ cpu_cpu_mask, NULL, cpu_cluster_energy, SD_INIT_NAME(DIE) },
+	{ NULL, },
+};
+
 static void update_cpu_capacity(unsigned int cpu)
 {
 	unsigned long capacity = SCHED_CAPACITY_SCALE;
