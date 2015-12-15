@@ -625,6 +625,7 @@ TRACE_EVENT(sched_load_avg_task,
 		__field( unsigned long,	util_avg		)
 		__field( unsigned long,	util_avg_pelt	)
 		__field( unsigned long,	util_avg_walt	)
+		__field( unsigned long,	util_est		)
 		__field( u64,		load_sum		)
 		__field( u32,		util_sum		)
 		__field( u32,		period_contrib		)
@@ -636,6 +637,7 @@ TRACE_EVENT(sched_load_avg_task,
 		__entry->cpu			= task_cpu(tsk);
 		__entry->load_avg		= avg->load_avg;
 		__entry->util_avg		= avg->util_avg;
+		__entry->util_est		= avg->util_est;
 		__entry->load_sum		= avg->load_sum;
 		__entry->util_sum		= avg->util_sum;
 		__entry->period_contrib		= avg->period_contrib;
@@ -650,6 +652,9 @@ TRACE_EVENT(sched_load_avg_task,
 	),
 	TP_printk("comm=%s pid=%d cpu=%d load_avg=%lu util_avg=%lu "
 			"util_avg_pelt=%lu util_avg_walt=%lu load_sum=%llu"
+
+	TP_printk("comm=%s pid=%d cpu=%d load_avg=%lu util_avg=%lu util_est=%lu load_sum=%llu"
+
 		  " util_sum=%u period_contrib=%u",
 		  __entry->comm,
 		  __entry->pid,
@@ -658,6 +663,7 @@ TRACE_EVENT(sched_load_avg_task,
 		  __entry->util_avg,
 		  __entry->util_avg_pelt,
 		  __entry->util_avg_walt,
+		  __entry->util_est,
 		  (u64)__entry->load_sum,
 		  (u32)__entry->util_sum,
 		  (u32)__entry->period_contrib)
@@ -678,6 +684,7 @@ TRACE_EVENT(sched_load_avg_cpu,
 		__field( unsigned long,	util_avg		)
 		__field( unsigned long,	util_avg_pelt	)
 		__field( unsigned long,	util_avg_walt	)
+		__field( unsigned long,	util_est		)
 	),
 
 	TP_fast_assign(
@@ -699,6 +706,12 @@ TRACE_EVENT(sched_load_avg_cpu,
 			  "util_avg_pelt=%lu util_avg_walt=%lu",
 		  __entry->cpu, __entry->load_avg, __entry->util_avg,
 		  __entry->util_avg_pelt, __entry->util_avg_walt)
+		__entry->util_est		= cfs_rq->avg.util_est;
+	),
+
+	TP_printk("cpu=%d load_avg=%lu util_avg=%lu util_est=%lu",
+		  __entry->cpu, __entry->load_avg, __entry->util_avg,
+		  __entry->util_est)
 );
 
 /*
