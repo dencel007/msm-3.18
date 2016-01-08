@@ -67,6 +67,7 @@ struct gov_data {
 	struct task_struct *task;
 	struct irq_work irq_work;
 	unsigned int requested_freq;
+	int max;
 };
 
 static void cpufreq_sched_try_driver_target(struct cpufreq_policy *policy,
@@ -208,6 +209,7 @@ static void update_fdomain_capacity_request(int cpu)
 
 	/* Convert the new maximum capacity request into a cpu frequency */
 	freq_new = capacity * policy->cpuinfo.max_freq >> SCHED_CAPACITY_SHIFT;
+	freq_new = capacity * gd->max >> SCHED_CAPACITY_SHIFT;
 	if (cpufreq_frequency_table_target(policy, policy->freq_table,
 					   freq_new, CPUFREQ_RELATION_L,
 					   &index_new))
@@ -394,6 +396,8 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 		gov_attr_set_get(&global_tunables->attr_set,
 				 &gd->tunables_hook);
 	}
+	gd->max = policy->max;
+
 
 	if (cpufreq_driver_is_slow()) {
 		cpufreq_driver_slow = true;
@@ -461,6 +465,7 @@ static void cpufreq_sched_limits(struct cpufreq_policy *policy)
 {
 	unsigned int clamp_freq;
 	struct gov_data *gd = policy->governor_data;;
+	struct gov_data *gd;
 
 	pr_debug("limit event for cpu %u: %u - %u kHz, currently %u kHz\n",
 		policy->cpu, policy->min, policy->max,
@@ -470,6 +475,22 @@ static void cpufreq_sched_limits(struct cpufreq_policy *policy)
 
 	if (policy->cur != clamp_freq)
 		__cpufreq_driver_target(policy, clamp_freq, CPUFREQ_RELATION_L);
+	if (!down_write_trylock(&policy->rwsem))
+		return;
+	/*
+	 * Need to keep track of highest max frequency for
+	 * capacity calculations
+	 */
+	gd = policy->governor_data;
+	if (gd->max < policy->max)
+		gd->max = policy->max;
+
+	if (policy->max < policy->cur)
+		__cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
+	else if (policy->min > policy->cur)
+		__cpufreq_driver_target(policy, policy->min, CPUFREQ_RELATION_L);
+
+	up_write(&policy->rwsem);
 }
 
 static int cpufreq_sched_stop(struct cpufreq_policy *policy)
