@@ -2943,6 +2943,15 @@ static void sched_freq_tick(int cpu)
 		return;
 
 	_sched_freq_tick(cpu);
+	/*
+	 * To make free room for a task that is building up its "real"
+	 * utilization and to harm its performance the least, request
+	 * a jump to max OPP as soon as the margin of free capacity is
+	 * impacted (specified by capacity_margin).
+	 */
+	scr = &per_cpu(cpu_sched_capacity_reqs, cpu);
+	if (capacity_curr < sum_capacity_reqs(cpu_util(cpu, UTIL_AVG), scr))
+		set_cfs_cpu_capacity(cpu, true, capacity_max);
 }
 #else
 static inline void sched_freq_tick(int cpu) { }

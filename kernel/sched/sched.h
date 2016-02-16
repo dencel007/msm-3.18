@@ -1478,6 +1478,14 @@ static inline unsigned long capacity_orig_of(int cpu)
 extern unsigned int sysctl_sched_use_walt_cpu_util;
 extern unsigned int walt_ravg_window;
 extern unsigned int walt_disabled;
+/* Force usage of PELT signal, i.e. util_avg */
+#define UTIL_AVG true
+/* Use estimated utilization when possible, i.e. UTIL_EST feature enabled */
+#define UTIL_EST false
+static inline bool use_util_est(void)
+{
+	return sched_feat(UTIL_EST);
+}
 
 /*
  * cpu_util returns the amount of capacity of a CPU that is used by CFS
@@ -1505,7 +1513,7 @@ extern unsigned int walt_disabled;
  * capacity_orig) as it useful for predicting the capacity required after task
  * migrations (scheduler-driven DVFS).
  */
-static inline unsigned long __cpu_util(int cpu, int delta)
+static inline unsigned long __cpu_util(int cpu, int delta, bool use_pelt)
 {
 	unsigned long util = cpu_rq(cpu)->cfs.avg.util_avg;
 	unsigned long capacity = capacity_orig_of(cpu);
@@ -1516,6 +1524,13 @@ static inline unsigned long __cpu_util(int cpu, int delta)
 		do_div(util, walt_ravg_window);
 	}
 #endif
+       /*
+	* The CPU estimated utilization is:
+	* 	max(util_avg, util_est)
+        */
+	if (use_util_est() && !use_pelt)
+		util = max(util, cpu_rq(cpu)->cfs.avg.util_est);
+
 	delta += util;
 	if (delta < 0)
 		return 0;
@@ -1523,9 +1538,9 @@ static inline unsigned long __cpu_util(int cpu, int delta)
 	return (delta >= capacity) ? capacity : delta;
 }
 
-static inline unsigned long cpu_util(int cpu)
+static inline unsigned long cpu_util(int cpu, bool use_pelt)
 {
-	return __cpu_util(cpu, 0);
+	return __cpu_util(cpu, 0, use_pelt);
 }
 
 #endif
