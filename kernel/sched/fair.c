@@ -69,6 +69,7 @@ __read_mostly unsigned int sysctl_sched_walt_cpu_high_irqload =
     (10 * NSEC_PER_MSEC);
 #endif
 unsigned int sysctl_sched_is_big_little = 0;
+unsigned int sysctl_sched_sync_hint_enable = 1;
 
 /*
  * The initial- and re-scaling of tunables is configurable
@@ -6343,6 +6344,15 @@ static int energy_aware_wake_cpu(struct task_struct *p, int target, int sync)
 
 	schedstat_inc(p, se.statistics.nr_wakeups_secb_attempts);
 	schedstat_inc(this_rq(), eas_stats.secb_attempts);
+	if (sysctl_sched_sync_hint_enable && sync) {
+		int cpu = smp_processor_id();
+		cpumask_t search_cpus;
+		cpumask_and(&search_cpus, tsk_cpus_allowed(p), cpu_online_mask);
+		if (cpumask_test_cpu(cpu, &search_cpus))
+			return cpu;
+	}
+
+	sd = rcu_dereference(per_cpu(sd_ea, task_cpu(p)));
 
 	if (sysctl_sched_sync_hint_enable && sync) {
 		int cpu = smp_processor_id();
