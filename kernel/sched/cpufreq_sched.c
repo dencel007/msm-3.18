@@ -20,6 +20,7 @@
 #include "sched.h"
 
 #define THROTTLE_DOWN_NSEC	50000000 /* 50ms default */
+#define THROTTLE_DOWN_NSEC	20000000 /* 20ms default */
 #define THROTTLE_UP_NSEC	500000 /* 500us default */
 
 struct static_key __read_mostly __sched_freq = STATIC_KEY_INIT_FALSE;
@@ -61,6 +62,8 @@ struct gov_data {
 	ktime_t down_throttle;
 	struct gov_tunables *tunables;
 	struct list_head tunables_hook;
+	unsigned int up_throttle_nsec;
+	unsigned int down_throttle_nsec;
 	struct task_struct *task;
 	struct irq_work irq_work;
 	unsigned int requested_freq;
@@ -81,6 +84,8 @@ static void cpufreq_sched_try_driver_target(struct cpufreq_policy *policy,
 				       gd->tunables->up_throttle_nsec);
 	gd->down_throttle = ktime_add_ns(ktime_get(),
 					 gd->tunables->down_throttle_nsec);
+	gd->up_throttle = ktime_add_ns(ktime_get(), gd->up_throttle_nsec);
+	gd->down_throttle = ktime_add_ns(ktime_get(), gd->down_throttle_nsec);
 	up_write(&policy->rwsem);
 }
 
@@ -347,6 +352,13 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 	gd = kzalloc(sizeof(*gd), GFP_KERNEL);
 	if (!gd)
 		return -ENOMEM;
+
+	gd->up_throttle_nsec = policy->cpuinfo.transition_latency ?
+			    policy->cpuinfo.transition_latency :
+			    THROTTLE_UP_NSEC;
+	gd->down_throttle_nsec = THROTTLE_DOWN_NSEC;
+	pr_debug("%s: throttle threshold = %u [ns]\n",
+		  __func__, gd->up_throttle_nsec);
 
 	policy->governor_data = gd;
 
