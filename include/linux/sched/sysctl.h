@@ -50,6 +50,8 @@ extern unsigned int sysctl_sched_walt_cpu_high_irqload;
 #endif
 extern unsigned int sysctl_sched_is_big_little;
 extern unsigned int sysctl_sched_sync_hint_enable;
+extern unsigned int sysctl_sched_initial_task_util;
+extern unsigned int sysctl_sched_cstate_aware;
 
 enum sched_tunable_scaling {
 	SCHED_TUNABLESCALING_NONE,
