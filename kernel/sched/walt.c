@@ -75,6 +75,14 @@ static cpumask_t mpc_mask = CPU_MASK_ALL;
 __read_mostly unsigned int walt_ravg_window = 20000000 / TICK_NSEC * TICK_NSEC;
 #define MIN_SCHED_RAVG_WINDOW (10000000 / TICK_NSEC * TICK_NSEC)
 #define MAX_SCHED_RAVG_WINDOW (1000000000 / TICK_NSEC * TICK_NSEC)
+/* Window size (in ns) */
+__read_mostly unsigned int walt_ravg_window = 20000000;
+
+/* Min window size (in ns) = 10ms */
+#define MIN_SCHED_RAVG_WINDOW 10000000
+
+/* Max window size (in ns) = 1s */
+#define MAX_SCHED_RAVG_WINDOW 1000000000
 
 static unsigned int sync_cpu;
 static ktime_t ktime_last;
@@ -191,6 +199,7 @@ update_window_start(struct rq *rq, u64 wallclock)
 		WARN_ONCE(1, "WALT wallclock appears to have gone backwards or reset\n");
 	}
 
+	BUG_ON(delta < 0);
 	if (delta < walt_ravg_window)
 		return;
 
@@ -224,71 +233,6 @@ static int cpu_is_waiting_on_io(struct rq *rq)
 		return 0;
 
 	return atomic_read(&rq->nr_iowait);
-}
-
-void walt_account_irqtime(int cpu, struct task_struct *curr,
-				 u64 delta, u64 wallclock)
-{
-	struct rq *rq = cpu_rq(cpu);
-	unsigned long flags, nr_windows;
-	u64 cur_jiffies_ts;
-
-	raw_spin_lock_irqsave(&rq->lock, flags);
-
-	/*
-	 * cputime (wallclock) uses sched_clock so use the same here for
-	 * consistency.
-	 */
-	delta += sched_clock() - wallclock;
-	cur_jiffies_ts = get_jiffies_64();
-
-	if (is_idle_task(curr))
-		walt_update_task_ravg(curr, rq, IRQ_UPDATE, walt_ktime_clock(),
-				 delta);
-
-	nr_windows = cur_jiffies_ts - rq->irqload_ts;
-
-	if (nr_windows) {
-		if (nr_windows < 10) {
-			/* Decay CPU's irqload by 3/4 for each window. */
-			rq->avg_irqload *= (3 * nr_windows);
-			rq->avg_irqload = div64_u64(rq->avg_irqload,
-						    4 * nr_windows);
-		} else {
-			rq->avg_irqload = 0;
-		}
-		rq->avg_irqload += rq->cur_irqload;
-		rq->cur_irqload = 0;
-	}
-
-	rq->cur_irqload += delta;
-	rq->irqload_ts = cur_jiffies_ts;
-	raw_spin_unlock_irqrestore(&rq->lock, flags);
-}
-
-
-#define WALT_HIGH_IRQ_TIMEOUT 3
-
-u64 walt_irqload(int cpu) {
-	struct rq *rq = cpu_rq(cpu);
-	s64 delta;
-	delta = get_jiffies_64() - rq->irqload_ts;
-
-        /*
-	 * Current context can be preempted by irq and rq->irqload_ts can be
-	 * updated by irq context so that delta can be negative.
-	 * But this is okay and we can safely return as this means there
-	 * was recent irq occurrence.
-	 */
-
-        if (delta < WALT_HIGH_IRQ_TIMEOUT)
-		return rq->avg_irqload;
-        else
-		return 0;
-}
-
-int walt_cpu_high_irqload(int cpu) {
-	return walt_irqload(cpu) >= sysctl_sched_walt_cpu_high_irqload;
 }
 
 static int account_busy_for_cpu_time(struct rq *rq, struct task_struct *p,
@@ -787,7 +731,7 @@ void walt_mark_task_starting(struct task_struct *p)
 		return;
 	}
 
-	wallclock = walt_ktime_clock();
+	wallclock = ktime_get_ns();
 	p->ravg.mark_start = wallclock;
 }
 
@@ -800,7 +744,7 @@ void walt_set_window_start(struct rq *rq)
 		return;
 
 	if (cpu == sync_cpu) {
-		rq->window_start = walt_ktime_clock();
+		rq->window_start = ktime_get_ns();
 	} else {
 		raw_spin_unlock(&rq->lock);
 		double_rq_lock(rq, sync_rq);
@@ -834,7 +778,7 @@ void walt_fixup_busy_time(struct task_struct *p, int new_cpu)
 	if (p->state == TASK_WAKING)
 		double_rq_lock(src_rq, dest_rq);
 
-	wallclock = walt_ktime_clock();
+	wallclock = ktime_get_ns();
 
 	walt_update_task_ravg(task_rq(p)->curr, task_rq(p),
 			TASK_UPDATE, wallclock, 0);
@@ -853,14 +797,8 @@ void walt_fixup_busy_time(struct task_struct *p, int new_cpu)
 		dest_rq->prev_runnable_sum += p->ravg.prev_window;
 	}
 
-	if ((s64)src_rq->prev_runnable_sum < 0) {
-		src_rq->prev_runnable_sum = 0;
-		WARN_ON(1);
-	}
-	if ((s64)src_rq->curr_runnable_sum < 0) {
-		src_rq->curr_runnable_sum = 0;
-		WARN_ON(1);
-	}
+	BUG_ON((s64)src_rq->prev_runnable_sum < 0);
+	BUG_ON((s64)src_rq->curr_runnable_sum < 0);
 
 	trace_walt_migration_update_sum(src_rq, p);
 	trace_walt_migration_update_sum(dest_rq, p);
@@ -1067,7 +1005,7 @@ static int cpufreq_notifier_trans(struct notifier_block *nb,
 
 		raw_spin_lock_irqsave(&rq->lock, flags);
 		walt_update_task_ravg(rq->curr, rq, TASK_UPDATE,
-				      walt_ktime_clock(), 0);
+				      ktime_get_ns(), 0);
 		rq->cur_freq = new_freq;
 		raw_spin_unlock_irqrestore(&rq->lock, flags);
 	}

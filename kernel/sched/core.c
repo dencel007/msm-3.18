@@ -1928,6 +1928,8 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	struct rq *rq;
 	u64 wallclock;
 #endif
+	struct rq *rq;
+	u64 wallclock;
 
 	/*
 	 * If we are going to wake up a thread waiting for CONDITION we
