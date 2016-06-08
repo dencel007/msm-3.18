@@ -461,6 +461,9 @@ void schedtune_cancel_attach(struct cgroup_subsys_state *css,
 	 * a proper rollback mechanism */
 	WARN(1, "SchedTune cancel attach not implemented");
 	schedtune_tasks_update(p, cpu, idx, ENQUEUE_TASK);
+
+	rcu_read_unlock();
+	raw_spin_unlock_irqrestore(&bg->lock, irq_flags);
 }
 
 /*
@@ -525,6 +528,9 @@ void schedtune_exit_task(struct task_struct *tsk)
 	rcu_read_unlock();
 	unlock_rq_of(rq, tsk, &irq_flags);
 	schedtune_tasks_update(p, cpu, idx, DEQUEUE_TASK);
+
+	rcu_read_unlock();
+	raw_spin_unlock_irqrestore(&bg->lock, irq_flags);
 }
 
 int schedtune_cpu_boost(int cpu)
