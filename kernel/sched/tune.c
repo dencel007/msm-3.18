@@ -264,17 +264,6 @@ schedtune_cpu_update(int cpu)
 		if (bg->group[idx].tasks == 0)
 			continue;
 
-		/* Ensures that boost_max is not zero when at least one of boost
-		 * values is negative.
-		 */
-		if (bg->group[idx].boost == 0 && boost_max != 0)
-			continue;
-
-		if (bg->group[idx].boost != 0 && boost_max == 0) {
-			boost_max = bg->group[idx].boost;
-			continue;
-		}
-
 		boost_max = max(boost_max, bg->group[idx].boost);
 	}
 	/* Ensures boost_max is non-negative when all cgroup boost values
