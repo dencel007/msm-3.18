@@ -186,6 +186,7 @@ static int __init set_walt_ravg_window(char *str)
 
 early_param("walt_ravg_window", set_walt_ravg_window);
 
+extern u64 arch_counter_get_cntpct(void);
 static void
 update_window_start(struct rq *rq, u64 wallclock)
 {
@@ -200,6 +201,12 @@ update_window_start(struct rq *rq, u64 wallclock)
 	}
 
 	BUG_ON(delta < 0);
+		if (arch_counter_get_cntpct() == 0)
+			delta = 0;
+		else
+			BUG_ON(1);
+	}
+
 	if (delta < walt_ravg_window)
 		return;
 
