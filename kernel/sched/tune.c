@@ -19,7 +19,6 @@ static bool schedtune_initialized = false;
 #endif
 
 unsigned int sysctl_sched_cfs_boost __read_mostly;
->>>>>>> d624db8... sched/tune: fix accounting for runnable tasks (5/5)
 
 int sysctl_sched_cfs_boost __read_mostly;
 
