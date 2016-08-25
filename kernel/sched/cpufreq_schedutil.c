@@ -201,6 +201,8 @@ static inline bool use_pelt(void)
 
 static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
 {
+static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
+{
 	int cpu = smp_processor_id();
 	struct rq *rq = cpu_rq(cpu);
 	unsigned long max_cap, rt;
@@ -219,6 +221,7 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
 	if (likely(use_pelt()))
 		*util = min((*util + rt), max_cap);
 
+	*util = min(rq->cfs.avg.util_avg + rt, max_cap);
 	*max = max_cap;
 }
 
@@ -312,6 +315,11 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu)
 	unsigned long util = 0, max = 1;
 	unsigned int j;
 
+	if (flags & SCHED_CPUFREQ_DL)
+		return max_f;
+
+	sugov_iowait_boost(sg_cpu, &util, &max);
+
 	for_each_cpu(j, policy->cpus) {
 		struct sugov_cpu *j_sg_cpu = &per_cpu(sugov_cpu, j);
 		unsigned long j_util, j_max;
@@ -331,6 +339,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu)
 		}
 		if (j_sg_cpu->flags & SCHED_CPUFREQ_DL)
 			return policy->cpuinfo.max_freq;
+			return max_f;
 
 		j_util = j_sg_cpu->util;
 		j_max = j_sg_cpu->max;
@@ -805,6 +814,20 @@ static int sugov_start(struct cpufreq_policy *policy)
 					     policy_is_shared(policy) ?
 							sugov_update_shared :
 							sugov_update_single);
+		if (policy_is_shared(policy)) {
+			sg_cpu->util = 0;
+			sg_cpu->max = 0;
+			sg_cpu->flags = SCHED_CPUFREQ_DL;
+			sg_cpu->last_update = 0;
+			sg_cpu->cached_raw_freq = 0;
+			sg_cpu->iowait_boost = 0;
+			sg_cpu->iowait_boost_max = policy->cpuinfo.max_freq;
+			cpufreq_add_update_util_hook(cpu, &sg_cpu->update_util,
+						     sugov_update_shared);
+		} else {
+			cpufreq_add_update_util_hook(cpu, &sg_cpu->update_util,
+						     sugov_update_single);
+		}
 	}
 	return 0;
 }
