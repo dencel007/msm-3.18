@@ -344,8 +344,38 @@ static struct kobj_type tunables_ktype = {
 static struct attribute_group sched_attr_group_gov_pol;
 static struct attribute_group *get_sysfs_attr(void)
 {
-	return &sched_attr_group_gov_pol;
+	struct gov_tunables *tunables = to_tunables(attr_set);
+
+	return sprintf(buf, "%u\n", tunables->down_throttle_nsec);
 }
+
+static ssize_t down_throttle_nsec_store(struct gov_attr_set *attr_set,
+					const char *buf, size_t count)
+{
+	struct gov_tunables *tunables = to_tunables(attr_set);
+	int ret;
+	long unsigned int val;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	tunables->down_throttle_nsec = val;
+	return count;
+}
+
+static struct governor_attr up_throttle_nsec = __ATTR_RW(up_throttle_nsec);
+static struct governor_attr down_throttle_nsec = __ATTR_RW(down_throttle_nsec);
+
+static struct attribute *schedfreq_attributes[] = {
+	&up_throttle_nsec.attr,
+	&down_throttle_nsec.attr,
+	NULL
+};
+
+static struct kobj_type tunables_ktype = {
+	.default_attrs = schedfreq_attributes,
+	.sysfs_ops = &governor_sysfs_ops,
+};
 
 static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 {
@@ -360,13 +390,6 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 	gd = kzalloc(sizeof(*gd), GFP_KERNEL);
 	if (!gd)
 		return -ENOMEM;
-
-	gd->up_throttle_nsec = policy->cpuinfo.transition_latency ?
-			    policy->cpuinfo.transition_latency :
-			    THROTTLE_UP_NSEC;
-	gd->down_throttle_nsec = THROTTLE_DOWN_NSEC;
-	pr_debug("%s: throttle threshold = %u [ns]\n",
-		  __func__, gd->up_throttle_nsec);
 
 	policy->governor_data = gd;
 
@@ -401,7 +424,6 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 		gd->tunables = global_tunables;
 		gov_attr_set_get(&global_tunables->attr_set,
 				 &gd->tunables_hook);
-	}
 	gd->max = policy->max;
 	rc = sysfs_create_group(get_governor_parent_kobj(policy), get_sysfs_attr());
 	if (rc) {
@@ -534,88 +556,6 @@ static int cpufreq_sched_setup(struct cpufreq_policy *policy,
 	return 0;
 }
 
-/* Tunables */
-static ssize_t show_up_throttle_nsec(struct gov_data *gd, char *buf)
-{
-	return sprintf(buf, "%u\n", gd->up_throttle_nsec);
-}
-
-static ssize_t store_up_throttle_nsec(struct gov_data *gd,
-		const char *buf, size_t count)
-{
-	int ret;
-	long unsigned int val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	gd->up_throttle_nsec = val;
-	return count;
-}
-
-static ssize_t show_down_throttle_nsec(struct gov_data *gd, char *buf)
-{
-	return sprintf(buf, "%u\n", gd->down_throttle_nsec);
-}
-
-static ssize_t store_down_throttle_nsec(struct gov_data *gd,
-		const char *buf, size_t count)
-{
-	int ret;
-	long unsigned int val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	gd->down_throttle_nsec = val;
-	return count;
-}
-
-/*
- * Create show/store routines
- * - sys: One governor instance for complete SYSTEM
- * - pol: One governor instance per struct cpufreq_policy
- */
-#define show_gov_pol_sys(file_name)					\
-static ssize_t show_##file_name##_gov_pol				\
-(struct cpufreq_policy *policy, char *buf)				\
-{									\
-	return show_##file_name(policy->governor_data, buf);		\
-}
-
-#define store_gov_pol_sys(file_name)					\
-static ssize_t store_##file_name##_gov_pol				\
-(struct cpufreq_policy *policy, const char *buf, size_t count)		\
-{									\
-	return store_##file_name(policy->governor_data, buf, count);	\
-}
-
-#define gov_pol_attr_rw(_name)						\
-	static struct freq_attr _name##_gov_pol =				\
-	__ATTR(_name, 0644, show_##_name##_gov_pol, store_##_name##_gov_pol)
-
-#define show_store_gov_pol_sys(file_name)				\
-	show_gov_pol_sys(file_name);						\
-	store_gov_pol_sys(file_name)
-#define tunable_handlers(file_name) \
-	show_gov_pol_sys(file_name); \
-	store_gov_pol_sys(file_name); \
-	gov_pol_attr_rw(file_name)
-
-tunable_handlers(down_throttle_nsec);
-tunable_handlers(up_throttle_nsec);
-
-/* Per policy governor instance */
-static struct attribute *sched_attributes_gov_pol[] = {
-	&up_throttle_nsec_gov_pol.attr,
-	&down_throttle_nsec_gov_pol.attr,
-	NULL,
-};
-
-static struct attribute_group sched_attr_group_gov_pol = {
-	.attrs = sched_attributes_gov_pol,
-	.name = "sched",
-};
 
 #ifndef CONFIG_CPU_FREQ_DEFAULT_GOV_SCHED
 static
