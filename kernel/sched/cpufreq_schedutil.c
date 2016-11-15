@@ -404,6 +404,15 @@ static void sugov_irq_work(struct irq_work *irq_work)
 	 * the schedutil governor rejects all other frequency scaling requests.
 	 *
 	 * There is a very rare case though, where the RT thread yields right
+	 * For Real Time and Deadline tasks, schedutil governor shoots the
+	 * frequency to maximum. And special care must be taken to ensure that
+	 * this kthread doesn't result in that.
+	 *
+	 * This is (mostly) guaranteed by the work_in_progress flag. The flag is
+	 * updated only at the end of the sugov_work() and before that schedutil
+	 * rejects all other frequency scaling requests.
+	 *
+	 * Though there is a very rare case where the RT thread yields right
 	 * after the work_in_progress flag is cleared. The effects of that are
 	 * neglected for now.
 	 */
@@ -537,6 +546,8 @@ static struct sugov_policy *sugov_policy_alloc(struct cpufreq_policy *policy)
 		return NULL;
 
 	sg_policy->policy = policy;
+	init_irq_work(&sg_policy->irq_work, sugov_irq_work);
+	mutex_init(&sg_policy->work_lock);
 	raw_spin_lock_init(&sg_policy->update_lock);
 	return sg_policy;
 }
@@ -687,6 +698,10 @@ static int sugov_init(struct cpufreq_policy *policy)
 	if (ret)
 		goto free_sg_policy;
 
+	ret = sugov_kthread_create(sg_policy);
+	if (ret)
+		goto free_sg_policy;
+
 	mutex_lock(&global_tunables_lock);
 
 	if (global_tunables) {
@@ -748,7 +763,7 @@ static int sugov_exit(struct cpufreq_policy *policy)
 	unsigned int count;
 
 	mutex_lock(&global_tunables_lock);
-	
+
 	store_tunables_data(sg_policy->tunables, policy);
 	count = gov_attr_set_put(&tunables->attr_set, &sg_policy->tunables_hook);
 	policy->governor_data = NULL;
@@ -756,7 +771,6 @@ static int sugov_exit(struct cpufreq_policy *policy)
 		sugov_tunables_free(tunables);
 
 	mutex_unlock(&global_tunables_lock);
-	
 	sugov_kthread_stop(sg_policy);
 	sugov_policy_free(sg_policy);
 
@@ -809,6 +823,9 @@ static int sugov_stop(struct cpufreq_policy *policy)
 		irq_work_sync(&sg_policy->irq_work);
 		kthread_cancel_work_sync(&sg_policy->work);
 	}
+	irq_work_sync(&sg_policy->irq_work);
+	kthread_cancel_work_sync(&sg_policy->work);
+
 	return 0;
 }
 
