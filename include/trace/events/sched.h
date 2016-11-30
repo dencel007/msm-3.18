@@ -1089,6 +1089,7 @@ TRACE_EVENT(walt_update_task_ravg,
 
 		__entry->cs, __entry->ps, __entry->util,
 		__entry->cs, __entry->ps,
+		__entry->cs, __entry->ps, __entry->util,
 		__entry->curr_window, __entry->prev_window,
 		  __entry->active_windows
 		)
