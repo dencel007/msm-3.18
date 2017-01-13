@@ -1517,7 +1517,7 @@ extern unsigned int walt_disabled;
  * capacity_orig) as it useful for predicting the capacity required after task
  * migrations (scheduler-driven DVFS).
  */
-static inline unsigned long __cpu_util(int cpu, int delta, bool use_pelt)
+static inline unsigned long __cpu_util(int cpu, int delta)
 {
 	unsigned long util = cpu_rq(cpu)->cfs.avg.util_avg;
 	unsigned long capacity = capacity_orig_of(cpu);
@@ -1547,9 +1547,9 @@ static inline unsigned long __cpu_util(int cpu, int delta, bool use_pelt)
 	return (delta >= capacity) ? capacity : delta;
 }
 
-static inline unsigned long cpu_util(int cpu, bool use_pelt)
+static inline unsigned long cpu_util(int cpu)
 {
-	return __cpu_util(cpu, 0, use_pelt);
+	return __cpu_util(cpu, 0);
 }
 
 #endif
