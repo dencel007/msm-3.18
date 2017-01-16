@@ -409,7 +409,6 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 		goto err;
 	}
 
-
 	if (cpufreq_driver_is_slow()) {
 		cpufreq_driver_slow = true;
 		gd->task = kthread_create(cpufreq_sched_thread, policy,
