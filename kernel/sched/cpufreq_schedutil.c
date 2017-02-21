@@ -699,7 +699,7 @@ static void store_tunables_data(struct sugov_tunables *tunables,
 		return;
 	ptunables->up_rate_limit_us = tunables->up_rate_limit_us;
 	ptunables->down_rate_limit_us = tunables->down_rate_limit_us;
-	ptunables->iowait_boost_enable = tunables->iowait_boost_enable; 
+	ptunables->iowait_boost_enable = tunables->iowait_boost_enable;
 
 	pr_debug("tunables data saved for cpu[%u]\n", cpu);
 }
@@ -719,7 +719,7 @@ static void get_tunables_data(struct sugov_tunables *tunables,
 		tunables->up_rate_limit_us = ptunables->up_rate_limit_us;
 		tunables->down_rate_limit_us = ptunables->down_rate_limit_us;
 		tunables->iowait_boost_enable = ptunables->iowait_boost_enable;
-		pr_debug("tunables data restored for cpu[%u]\n", cpu);
+	pr_debug("tunables data restored for cpu[%u]\n", cpu);
 		goto out;
 	}
 
@@ -731,7 +731,6 @@ initialize:
 		tunables->up_rate_limit_us *= lat;
 		tunables->down_rate_limit_us *= lat;
 	}
-	
 	pr_debug("tunables data initialized for cpu[%u]\n", cpu);
 out:
 	return;
@@ -792,6 +791,7 @@ static int sugov_init(struct cpufreq_policy *policy)
 		tunables->down_rate_limit_us *= lat;
 	}
 
+	get_tunables_data(tunables, policy);
 	policy->governor_data = sg_policy;
 	sg_policy->tunables = tunables;
 
@@ -831,7 +831,6 @@ static int sugov_exit(struct cpufreq_policy *policy)
 	unsigned int count;
 
 	mutex_lock(&global_tunables_lock);
-
 	store_tunables_data(sg_policy->tunables, policy);
 	count = gov_attr_set_put(&tunables->attr_set, &sg_policy->tunables_hook);
 	policy->governor_data = NULL;
