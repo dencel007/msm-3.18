@@ -393,7 +393,6 @@ config IRQ_TIME_ACCOUNTING
 endchoice
 
 config SCHED_WALT
-
 	bool "Support window based load tracking"
 	depends on SMP
 	depends on FAIR_GROUP_SCHED
