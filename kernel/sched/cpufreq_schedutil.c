@@ -576,6 +576,28 @@ static ssize_t down_rate_limit_us_store(struct gov_attr_set *attr_set,
 	return count;
 }
 
+static ssize_t iowait_boost_enable_show(struct gov_attr_set *attr_set,
+					char *buf)
+{
+	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
+
+	return sprintf(buf, "%u\n", tunables->iowait_boost_enable);
+}
+
+static ssize_t iowait_boost_enable_store(struct gov_attr_set *attr_set,
+					 const char *buf, size_t count)
+{
+	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
+	bool enable;
+
+	if (strtobool(buf, &enable))
+		return -EINVAL;
+
+	tunables->iowait_boost_enable = enable;
+
+	return count;
+}
+
 static struct governor_attr up_rate_limit_us = __ATTR_RW(up_rate_limit_us);
 static struct governor_attr down_rate_limit_us = __ATTR_RW(down_rate_limit_us);
 static struct governor_attr iowait_boost_enable = __ATTR_RW(iowait_boost_enable);
@@ -700,6 +722,7 @@ static void store_tunables_data(struct sugov_tunables *tunables,
 	ptunables->up_rate_limit_us = tunables->up_rate_limit_us;
 	ptunables->down_rate_limit_us = tunables->down_rate_limit_us;
 	ptunables->iowait_boost_enable = tunables->iowait_boost_enable;
+	ptunables->iowait_boost_enable = tunables->iowait_boost_enable;
 
 	pr_debug("tunables data saved for cpu[%u]\n", cpu);
 }
@@ -720,6 +743,7 @@ static void get_tunables_data(struct sugov_tunables *tunables,
 		tunables->down_rate_limit_us = ptunables->down_rate_limit_us;
 		tunables->iowait_boost_enable = ptunables->iowait_boost_enable;
 	pr_debug("tunables data restored for cpu[%u]\n", cpu);
+		pr_debug("tunables data restored for cpu[%u]\n", cpu);
 		goto out;
 	}
 
