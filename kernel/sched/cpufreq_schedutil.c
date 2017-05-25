@@ -331,11 +331,6 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu)
 	unsigned long util = 0, max = 1;
 	unsigned int j;
 
-	if (flags & SCHED_CPUFREQ_DL)
-		return max_f;
-
-	sugov_iowait_boost(sg_cpu, &util, &max);
-
 	for_each_cpu(j, policy->cpus) {
 		struct sugov_cpu *j_sg_cpu = &per_cpu(sugov_cpu, j);
 		unsigned long j_util, j_max;
