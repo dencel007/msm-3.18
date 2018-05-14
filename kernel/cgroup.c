@@ -2366,7 +2366,7 @@ retry_find_task:
 		    !uid_eq(cred->euid, tcred->uid) &&
 		    !uid_eq(cred->euid, tcred->suid) &&
 		    !ns_capable(tcred->user_ns, CAP_SYS_RESOURCE)) {
-			/*rcu_read_unlock();
+			rcu_read_unlock();
 			ret = -EACCES;
 			goto out_unlock_cgroup;
 		    !uid_eq(cred->euid, tcred->suid)) {
@@ -2394,6 +2394,7 @@ retry_find_task:
 			}
 			rcu_read_unlock();
 			ret = -EACCES;
+			goto out_unlock_cgroup;
 			goto out_unlock_cgroup;
 		}
 	} else
