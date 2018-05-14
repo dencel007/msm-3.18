@@ -2366,10 +2366,12 @@ retry_find_task:
 		    !uid_eq(cred->euid, tcred->uid) &&
 		    !uid_eq(cred->euid, tcred->suid) &&
 		    !ns_capable(tcred->user_ns, CAP_SYS_RESOURCE)) {
-			rcu_read_unlock();
+			/*rcu_read_unlock();
 			ret = -EACCES;
 			goto out_unlock_cgroup;
 		    !uid_eq(cred->euid, tcred->suid)) {
+			goto out_unlock_cgroup;*/
+
 			/*
 			 * if the default permission check fails, give each
 			 * cgroup a chance to extend the permission check
@@ -2382,6 +2384,9 @@ retry_find_task:
 			struct css_set *cset;
 			cset = task_css_set(tsk);
 			list_add(&cset->mg_node, &tset.src_csets);
+			struct cgroup_taskset tset = { };
+			tset.single.task = tsk;
+			tset.single.cgrp = cgrp;
 			ret = cgroup_allow_attach(cgrp, &tset);
 			if (ret) {
 				rcu_read_unlock();
