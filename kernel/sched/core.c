@@ -954,7 +954,7 @@ static void update_rq_clock_task(struct rq *rq, s64 delta)
 	rq->clock_task += delta;
 
 #if defined(CONFIG_IRQ_TIME_ACCOUNTING) || defined(CONFIG_PARAVIRT_TIME_ACCOUNTING)
-	if ((irq_delta + steal) && sched_feat(NONTASK_CAPACITY))
+	if (sched_feat(NONTASK_CAPACITY) && (irq_delta + steal) != 0)
 		sched_rt_avg_update(rq, irq_delta + steal);
 #endif
 }
@@ -1928,9 +1928,6 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	struct rq *rq;
 	u64 wallclock;
 #endif
-	struct rq *rq;
-	u64 wallclock;
-#endif
 
 	/*
 	 * If we are going to wake up a thread waiting for CONDITION we
@@ -2136,10 +2133,6 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->se.vruntime			= 0;
 	INIT_LIST_HEAD(&p->se.group_node);
 	walt_init_new_task_load(p);
-
-#ifdef CONFIG_FAIR_GROUP_SCHED
-	p->se.cfs_rq			= NULL;
-#endif
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	p->se.cfs_rq			= NULL;
@@ -2892,71 +2885,6 @@ static void sched_freq_tick_pelt(int cpu)
 	if (sum_capacity_reqs(cpu_utilization, scr) < capacity_curr)
 		return;
 
-	/*
-	 * To make free room for a task that is building up its "real"
-	 * utilization and to harm its performance the least, request
-	 * a jump to a higher OPP as soon as the margin of free capacity
-	 * is impacted (specified by capacity_margin).
-	 */
-	set_cfs_cpu_capacity(cpu, true, cpu_utilization);
-}
-
-#ifdef CONFIG_SCHED_WALT
-static void sched_freq_tick_walt(int cpu)
-{
-	unsigned long cpu_utilization = cpu_util(cpu);
-	unsigned long capacity_curr = capacity_curr_of(cpu);
-
-	if (walt_disabled || !sysctl_sched_use_walt_cpu_util)
-		return sched_freq_tick_pelt(cpu);
-
-	/*
-	 * Add a margin to the WALT utilization.
-	 * NOTE: WALT tracks a single CPU signal for all the scheduling
-	 * classes, thus this margin is going to be added to the DL class as
-	 * well, which is something we do not do in sched_freq_tick_pelt case.
-	 */
-	cpu_utilization = add_capacity_margin(cpu_utilization);
-	if (cpu_utilization <= capacity_curr)
-		return;
-
-	/*
-	 * It is likely that the load is growing so we
-	 * keep the added margin in our request as an
-	 * extra boost.
-	 */
-	set_cfs_cpu_capacity(cpu, true, cpu_utilization);
-
-}
-#define _sched_freq_tick(cpu) sched_freq_tick_walt(cpu)
-#else
-#define _sched_freq_tick(cpu) sched_freq_tick_pelt(cpu)
-#endif /* CONFIG_SCHED_WALT */
-
-static void sched_freq_tick(int cpu)
-{
-	unsigned long capacity_orig, capacity_curr;
-	unsigned long capacity_orig, capacity_curr, capacity_sum;
-static void sched_freq_tick_pelt(int cpu)
-static void sched_freq_tick(int cpu)
-static void sched_freq_tick_pelt(int cpu)
-{
-	unsigned long cpu_utilization = boosted_cpu_util(cpu);
-	unsigned long capacity_curr = capacity_curr_of(cpu);
-	struct sched_capacity_reqs *scr;
-
-
-	scr = &per_cpu(cpu_sched_capacity_reqs, cpu);
-	if (sum_capacity_reqs(cpu_utilization, scr) < capacity_curr)
-	if (!sched_freq())
-	scr = &per_cpu(cpu_sched_capacity_reqs, cpu);
-	if (sum_capacity_reqs(cpu_utilization, scr) < capacity_curr)
-		return;
-
-	if (!use_util_est())
-		cpu_utilization = capacity_max;
-
-	_sched_freq_tick(cpu);
 	/*
 	 * To make free room for a task that is building up its "real"
 	 * utilization and to harm its performance the least, request
@@ -7119,7 +7047,6 @@ struct sched_domain *build_sched_domain(struct sched_domain_topology_level *tl,
 		struct sched_domain *child, int cpu)
 {
 	struct sched_domain *sd = sd_init(tl, child, cpu);
-	struct sched_domain *sd = sd_init(tl, cpu);
 
 	cpumask_and(sched_domain_span(sd), cpu_map, tl->mask(cpu));
 	if (child) {

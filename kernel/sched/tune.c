@@ -15,11 +15,6 @@
 bool schedtune_initialized = false;
 #endif
 
-static bool schedtune_initialized = false;
-#endif
-
-int sysctl_sched_cfs_boost __read_mostly;
-
 int sysctl_sched_cfs_boost __read_mostly;
 
 extern struct reciprocal_value schedtune_spc_rdiv;
@@ -454,10 +449,6 @@ void schedtune_cancel_attach(struct cgroup_subsys_state *css,
 	 * mouted on its own hierarcy, for the time being we do not implement
 	 * a proper rollback mechanism */
 	WARN(1, "SchedTune cancel attach not implemented");
-	schedtune_tasks_update(p, cpu, idx, ENQUEUE_TASK);
-
-	rcu_read_unlock();
-	raw_spin_unlock_irqrestore(&bg->lock, irq_flags);
 }
 
 /*
@@ -521,10 +512,6 @@ void schedtune_exit_task(struct task_struct *tsk)
 
 	rcu_read_unlock();
 	unlock_rq_of(rq, tsk, &irq_flags);
-	schedtune_tasks_update(p, cpu, idx, DEQUEUE_TASK);
-
-	rcu_read_unlock();
-	raw_spin_unlock_irqrestore(&bg->lock, irq_flags);
 }
 
 int schedtune_cpu_boost(int cpu)

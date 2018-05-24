@@ -20,7 +20,6 @@
 #include "sched.h"
 
 #define THROTTLE_DOWN_NSEC	50000000 /* 50ms default */
-#define THROTTLE_DOWN_NSEC	20000000 /* 20ms default */
 #define THROTTLE_UP_NSEC	500000 /* 500us default */
 
 struct static_key __read_mostly __sched_freq = STATIC_KEY_INIT_FALSE;
@@ -62,8 +61,6 @@ struct gov_data {
 	ktime_t down_throttle;
 	struct gov_tunables *tunables;
 	struct list_head tunables_hook;
-	unsigned int up_throttle_nsec;
-	unsigned int down_throttle_nsec;
 	struct task_struct *task;
 	struct irq_work irq_work;
 	unsigned int requested_freq;
@@ -84,8 +81,6 @@ static void cpufreq_sched_try_driver_target(struct cpufreq_policy *policy,
 				       gd->tunables->up_throttle_nsec);
 	gd->down_throttle = ktime_add_ns(ktime_get(),
 					 gd->tunables->down_throttle_nsec);
-	gd->up_throttle = ktime_add_ns(ktime_get(), gd->up_throttle_nsec);
-	gd->down_throttle = ktime_add_ns(ktime_get(), gd->down_throttle_nsec);
 	up_write(&policy->rwsem);
 }
 
@@ -208,8 +203,6 @@ static void update_fdomain_capacity_request(int cpu)
 
 	/* Convert the new maximum capacity request into a cpu frequency */
 	freq_new = capacity * policy->cpuinfo.max_freq >> SCHED_CAPACITY_SHIFT;
-	freq_new = capacity * gd->max >> SCHED_CAPACITY_SHIFT;
-	freq_new = capacity * policy->max >> SCHED_CAPACITY_SHIFT;
 	if (cpufreq_frequency_table_target(policy, policy->freq_table,
 					   freq_new, CPUFREQ_RELATION_L,
 					   &index_new))
@@ -341,42 +334,6 @@ static struct kobj_type tunables_ktype = {
 	.sysfs_ops = &governor_sysfs_ops,
 };
 
-static struct attribute_group sched_attr_group_gov_pol;
-static struct attribute_group *get_sysfs_attr(void)
-{
-	struct gov_tunables *tunables = to_tunables(attr_set);
-
-	return sprintf(buf, "%u\n", tunables->down_throttle_nsec);
-}
-
-static ssize_t down_throttle_nsec_store(struct gov_attr_set *attr_set,
-					const char *buf, size_t count)
-{
-	struct gov_tunables *tunables = to_tunables(attr_set);
-	int ret;
-	long unsigned int val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	tunables->down_throttle_nsec = val;
-	return count;
-}
-
-static struct governor_attr up_throttle_nsec = __ATTR_RW(up_throttle_nsec);
-static struct governor_attr down_throttle_nsec = __ATTR_RW(down_throttle_nsec);
-
-static struct attribute *schedfreq_attributes[] = {
-	&up_throttle_nsec.attr,
-	&down_throttle_nsec.attr,
-	NULL
-};
-
-static struct kobj_type tunables_ktype = {
-	.default_attrs = schedfreq_attributes,
-	.sysfs_ops = &governor_sysfs_ops,
-};
-
 static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 {
 	struct gov_data *gd;
@@ -424,11 +381,6 @@ static int cpufreq_sched_policy_init(struct cpufreq_policy *policy)
 		gd->tunables = global_tunables;
 		gov_attr_set_get(&global_tunables->attr_set,
 				 &gd->tunables_hook);
-	gd->max = policy->max;
-	rc = sysfs_create_group(get_governor_parent_kobj(policy), get_sysfs_attr());
-	if (rc) {
-		pr_err("%s: couldn't create sysfs attributes: %d\n", __func__, rc);
-		goto err;
 	}
 
 	if (cpufreq_driver_is_slow()) {
@@ -476,7 +428,6 @@ static int cpufreq_sched_policy_exit(struct cpufreq_policy *policy)
 			global_tunables = NULL;
 		kfree(gd->tunables);
 	}
-	sysfs_remove_group(get_governor_parent_kobj(policy), get_sysfs_attr());
 
 	policy->governor_data = NULL;
 
@@ -498,30 +449,12 @@ static void cpufreq_sched_limits(struct cpufreq_policy *policy)
 {
 	unsigned int clamp_freq;
 	struct gov_data *gd = policy->governor_data;;
-	struct gov_data *gd;
 
 	pr_debug("limit event for cpu %u: %u - %u kHz, currently %u kHz\n",
 		policy->cpu, policy->min, policy->max,
 		policy->cur);
 
 	clamp_freq = clamp(gd->requested_freq, policy->min, policy->max);
-
-	if (policy->cur != clamp_freq)
-		__cpufreq_driver_target(policy, clamp_freq, CPUFREQ_RELATION_L);
-	if (!down_write_trylock(&policy->rwsem))
-		return;
-	/*
-	 * Need to keep track of highest max frequency for
-	 * capacity calculations
-	 */
-	gd = policy->governor_data;
-	if (gd->max < policy->max)
-		gd->max = policy->max;
-
-	if (policy->max < policy->cur)
-		__cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
-	else if (policy->min > policy->cur)
-		__cpufreq_driver_target(policy, policy->min, CPUFREQ_RELATION_L);
 
 	if (policy->cur != clamp_freq)
 		__cpufreq_driver_target(policy, clamp_freq, CPUFREQ_RELATION_L);

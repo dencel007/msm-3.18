@@ -1478,18 +1478,6 @@ static inline unsigned long capacity_orig_of(int cpu)
 extern unsigned int sysctl_sched_use_walt_cpu_util;
 extern unsigned int walt_ravg_window;
 extern unsigned int walt_disabled;
-/* Force usage of PELT signal, i.e. util_avg */
-#define UTIL_AVG true
-/* Use estimated utilization when possible, i.e. UTIL_EST feature enabled */
-#define UTIL_EST false
-static inline bool use_util_est(void)
-{
-	return sched_feat(UTIL_EST);
-}
-
-extern unsigned int sysctl_sched_use_walt_cpu_util;
-extern unsigned int walt_ravg_window;
-extern unsigned int walt_disabled;
 
 /*
  * cpu_util returns the amount of capacity of a CPU that is used by CFS
@@ -1527,18 +1515,6 @@ static inline unsigned long __cpu_util(int cpu, int delta)
 		util = cpu_rq(cpu)->prev_runnable_sum << SCHED_LOAD_SHIFT;
 		do_div(util, walt_ravg_window);
 	}
-#endif
-       /*
-	* The CPU estimated utilization is:
-	* 	max(util_avg, util_est)
-        */
-	if (use_util_est() && !use_pelt)
-		util = max(util, cpu_rq(cpu)->cfs.avg.util_est);
-
-#ifdef CONFIG_SCHED_WALT
-	if (!walt_disabled && sysctl_sched_use_walt_cpu_util)
-		util = (cpu_rq(cpu)->prev_runnable_sum << SCHED_LOAD_SHIFT) /
-			walt_ravg_window;
 #endif
 	delta += util;
 	if (delta < 0)

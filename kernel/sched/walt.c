@@ -75,14 +75,6 @@ static cpumask_t mpc_mask = CPU_MASK_ALL;
 __read_mostly unsigned int walt_ravg_window = 20000000 / TICK_NSEC * TICK_NSEC;
 #define MIN_SCHED_RAVG_WINDOW (10000000 / TICK_NSEC * TICK_NSEC)
 #define MAX_SCHED_RAVG_WINDOW (1000000000 / TICK_NSEC * TICK_NSEC)
-/* Window size (in ns) */
-__read_mostly unsigned int walt_ravg_window = 20000000;
-
-/* Min window size (in ns) = 10ms */
-#define MIN_SCHED_RAVG_WINDOW 10000000
-
-/* Max window size (in ns) = 1s */
-#define MAX_SCHED_RAVG_WINDOW 1000000000
 
 static unsigned int sync_cpu;
 static ktime_t ktime_last;
@@ -197,13 +189,6 @@ update_window_start(struct rq *rq, u64 wallclock)
 	if (delta < 0) {
 		delta = 0;
 		WARN_ONCE(1, "WALT wallclock appears to have gone backwards or reset\n");
-	}
-
-	BUG_ON(delta < 0);
-		if (arch_counter_get_cntpct() == 0)
-			delta = 0;
-		else
-			BUG_ON(1);
 	}
 
 	if (delta < walt_ravg_window)
