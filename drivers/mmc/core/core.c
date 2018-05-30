@@ -3934,9 +3934,6 @@ void mmc_rescan(struct work_struct *work)
 	if (host->ignore_bus_resume_flags)
 		host->ignore_bus_resume_flags = false;
 
-	if (host->ignore_bus_resume_flags)
-		host->ignore_bus_resume_flags = false;
-
 	/*
 	 * Let mmc_bus_put() free the bus/bus_ops if we've found that
 	 * the card is no longer present.
