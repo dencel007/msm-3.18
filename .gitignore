@@ -32,6 +32,9 @@
 *.lzo
 *.patch
 *.gcno
+*.zip
+*.zImage
+zImage
 modules.builtin
 Module.symvers
 *.dwo
@@ -43,7 +46,8 @@ Module.symvers
 /TAGS
 /linux
 /vmlinux
-/vmlinuz
+/vmlinu
+/zImage
 /System.map
 /Module.markers
 
