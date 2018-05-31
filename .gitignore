@@ -23,6 +23,9 @@
 *.symtypes
 *.order
 *.elf
+*.zip
+zImage
+/zImage
 *.bin
 *.gz
 *.bz2
@@ -46,6 +49,8 @@ Module.symvers
 /vmlinuz
 /System.map
 /Module.markers
+zImage
+/zImage
 
 #
 # Debian directory (make deb-pkg)
